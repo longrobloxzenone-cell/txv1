@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tài Xỉu Firebase</title>
+<style>
+body{background: linear-gradient(to bottom,#8b0000,#000);color:#fff;font-family:'Arial Black',sans-serif;text-align:center;margin:0;padding:0;}
+#owner{position:fixed;top:10px;left:10px;font-weight:bold;font-size:20px;color:#ffd700;text-shadow:2px 2px 4px #000;z-index:999;}
+input,button,textarea{padding:8px;margin:5px;border-radius:5px;border:none;}
+button{cursor:pointer;transition:0.2s;}
+button:hover{opacity:0.8;}
+#wallet{font-size:20px;margin:10px;}
+#diceArea{margin:20px;display:flex;justify-content:center;gap:15px;}
+.dice{width:90px;height:90px;background:#fff;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:40px;color:#000;box-shadow:0 5px 15px rgba(0,0,0,0.7),0 0 5px #ffd700 inset;transition:transform 0.5s;}
+.flash-win{animation:flashWin 0.5s;} .flash-lose{animation:flashLose 0.5s;}
+@keyframes flashWin{0%{background:#121212;}50%{background:#2e7d32;}100%{background:#121212;}}
+@keyframes flashLose{0%{background:#121212;}50%{background:#b71c1c;}100%{background:#121212;}}
+#chipArea{margin:15px;} .chip{width:75px;height:75px;border-radius:50%;margin:10px;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.5),0 0 0 2px #fff inset;border:2px solid #fff;font-size:18px;text-shadow:0 2px 2px rgba(0,0,0,0.5);transition: all 0.3s ease;}
+.chip:hover{transform: scale(1.3) rotateY(10deg);box-shadow:0 6px 12px rgba(0,0,0,0.7),0 0 0 2px #ffd700 inset;}
+.chip.selected{border:3px solid #ffd700;box-shadow:0 6px 14px rgba(0,0,0,0.8),0 0 8px #ffd700 inset;transform:scale(1.35);}
+.chip[data-value="1000"]{background:linear-gradient(145deg,#4caf50,#087f23);}
+.chip[data-value="5000"]{background:linear-gradient(145deg,#2196f3,#0d47a1);}
+.chip[data-value="10000"]{background:linear-gradient(145deg,#ff9800,#e65100);}
+.chip[data-value="50000"]{background:linear-gradient(145deg,#e91e63,#880e4f);}
+.chip[data-value="1000000"]{background:linear-gradient(145deg,#ffeb3b,#fbc02d);}
+.chip[data-value="2000000"]{background:linear-gradient(145deg,#ff9800,#f57c00);}
+.chip[data-value="5000000"]{background:linear-gradient(145deg,#e91e63,#c2185b);}
+#adminPanel{margin-top:20px;border-top:1px solid #fff;padding-top:10px;display:none;}
+#chatBox{margin-top:15px;border:1px solid #fff;padding:10px;width:300px;margin:auto;}
+#chatMessages{height:150px;width:100%;overflow-y:auto;background:#222;color:#fff;padding:5px;margin-bottom:5px;}
+</style>
+</head>
+<body>
+<div id="owner">lowt</div>
+
+<!-- Login/Register -->
+<div id="loginPanel">
+<h2>Đăng nhập / Đăng ký</h2>
+<input type="text" id="username" placeholder="Tên đăng nhập">
+<input type="password" id="password" placeholder="Mật khẩu"><br>
+<button onclick="login()">Đăng nhập</button>
+<button onclick="register()">Đăng ký</button>
+<p id="loginMsg" style="color:yellow;"></p>
+</div>
+
+<!-- Game Panel -->
+<div id="gamePanel" style="display:none;">
+<h2>Chào, <span id="userName"></span></h2>
+<button onclick="logout()">Đăng xuất</button>
+<div id="wallet">Ví: <span id="money">0</span> $</div>
+
+<!-- Dice -->
+<div id="diceArea">
+  <div id="dice1" class="dice">🎲</div>
+  <div id="dice2" class="dice">🎲</div>
+  <div id="dice3" class="dice">🎲</div>
+</div>
+<div id="result" style="font-size:20px;margin:10px;"></div>
+
+<!-- Chips -->
+<div id="chipArea">
+  <div class="chip" data-value="1000">1K</div>
+  <div class="chip" data-value="5000">5K</div>
+  <div class="chip" data-value="10000">10K</div>
+  <div class="chip" data-value="50000">50K</div>
+  <div class="chip" data-value="1000000">1M</div>
+  <div class="chip" data-value="2000000">2M</div>
+  <div class="chip" data-value="5000000">5M</div>
+</div>
+<div id="selectedBet">Cược: 0 $ | Chọn: -</div>
+<button onclick="chooseBet('Tài')">Tài</button>
+<button onclick="chooseBet('Xỉu')">Xỉu</button>
+<button onclick="rollDice()">Quay xúc xắc</button><br>
+
+<!-- Chat -->
+<div id="chatBox">
+<div id="chatMessages"></div>
+<input type="text" id="chatInput" placeholder="Nhập tin nhắn...">
+<button onclick="sendChat()">Gửi</button>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel">
+<h3>Admin Panel</h3>
+<button onclick="force('Tài')">Ép Tài</button>
+<button onclick="force('Xỉu')">Ép Xỉu</button>
+<button onclick="force(null)">Huỷ ép</button>
+<button onclick="toggleLock()">Khoá/ Mở cược</button>
+<br>
+<input type="text" id="grantAdminUser" placeholder="Tên user">
+<button onclick="grantAdmin()">Cấp quyền Admin</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, onSnapshot, collection, addDoc, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC7MuVncVnX7FRwLkqLaQHrXOYULe80QCY",
+  authDomain: "mylist644.firebaseapp.com",
+  projectId: "mylist644",
+  storageBucket: "mylist644.firebasestorage.app",
+  messagingSenderId: "185723905502",
+  appId: "1:185723905502:web:efe5c0640b3a7cc992694f",
+  measurementId: "G-YF8TYKTBBE"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser=null;
+let selectedBetAmount=0;
+let selectedChoice=null;
+let forceResultValue=null;
+let locked=false;
+
+// Elements
+const loginPanel=document.getElementById("loginPanel");
+const gamePanel=document.getElementById("gamePanel");
+const userNameEl=document.getElementById("userName");
+const moneyEl=document.getElementById("money");
+const selectedBetEl=document.getElementById("selectedBet");
+const resultEl=document.getElementById("result");
+const diceEls=[document.getElementById("dice1"),document.getElementById("dice2"),document.getElementById("dice3")];
+const chatMessages=document.getElementById("chatMessages");
+
+// ======= Register/Login =======
+async function register(){
+  const username=document.getElementById("username").value;
+  const password=document.getElementById("password").value;
+  if(!username||!password) return alert("Nhập đủ thông tin");
+  try{
+    const email=username+"@game.com";
+    await createUserWithEmailAndPassword(auth,email,password);
+    await setDoc(doc(db,"users",username),{money:500000,isAdmin:false,logs:[]});
+    alert("Đăng ký thành công!");
+  }catch(e){alert(e.message);}
+}
+
+async function login(){
+  const username=document.getElementById("username").value;
+  const password=document.getElementById("password").value;
+  if(!username||!password) return alert("Nhập đủ thông tin");
+  try{
+    const email=username+"@game.com";
+    await signInWithEmailAndPassword(auth,email,password);
+    currentUser=username;
+    userNameEl.innerText=currentUser;
+    loginPanel.style.display="none";
+    gamePanel.style.display="block";
+    await loadUserData();
+    await initAdminState();
+    listenAdminState();
+    listenChat();
+  }catch(e){alert(e.message);}
+}
+
+function logout(){
+  signOut(auth);
+  currentUser=null;
+  loginPanel.style.display="block";
+  gamePanel.style.display="none";
+}
+
+// ======= Chips & Choice =======
+document.querySelectorAll(".chip").forEach(c=>{
+  c.addEventListener("click",()=>{
+    selectedBetAmount=parseInt(c.dataset.value);
+    document.querySelectorAll(".chip").forEach(ch=>ch.classList.remove("selected"));
+    c.classList.add("selected");
+    updateBetDisplay();
+  });
+});
+
+function chooseBet(choice){selectedChoice=choice;updateBetDisplay();}
+function updateBetDisplay(){selectedBetEl.innerText=`Cược: ${selectedBetAmount.toLocaleString()} $ | Chọn: ${selectedChoice||"-"}`;}
+
+// ======= Load User Data =======
+async function loadUserData(){
+  const docSnap=await getDoc(doc(db,"users",currentUser));
+  if(docSnap.exists()){
+    moneyEl.innerText=docSnap.data().money.toLocaleString();
+    if(docSnap.data().isAdmin) document.getElementById("adminPanel").style.display="block";
+  }
+}
+
+// ======= Dice Roll =======
+async function rollDice(){
+  if(locked){alert("Cược đang bị khóa!"); return;}
+  if(!selectedChoice || selectedBetAmount<=0){alert("Chọn cược và chip!"); return;}
+  const userRef=doc(db,"users",currentUser);
+  const docSnap=await getDoc(userRef);
+  let money=docSnap.data().money;
+  if(money<selectedBetAmount){alert("Không đủ tiền!"); return;}
+  let diceNums=[1,2,3].map(()=>Math.floor(Math.random()*6)+1);
+  diceNums.forEach((num,i)=>{
+    let diceEl=diceEls[i]; let count=0;
+    let interval=setInterval(()=>{
+      diceEl.innerText=Math.floor(Math.random()*6)+1;
+      count++; if(count>10){clearInterval(interval); diceEl.innerText=num;}
+    },50);
+  });
+  let sum=diceNums.reduce((a,b)=>a+b,0);
+  let result=sum>=11?"Tài":"Xỉu";
+  if(forceResultValue) result=forceResultValue;
+  let win=result===selectedChoice;
+  await updateDoc(userRef,{
+    money: win?money+selectedBetAmount : money-selectedBetAmount,
+    logs: arrayUnion({dice:diceNums,bet:selectedChoice,amount:selectedBetAmount,win,result,time:Date.now()})
+  });
+  moneyEl.innerText=(win?money+selectedBetAmount:money-selectedBetAmount).toLocaleString();
+  resultEl.innerText=`Kết quả: ${result} | Tổng: ${sum}`;
+  resultEl.className="";
+  void resultEl.offsetWidth;
+  resultEl.className=win?"flash-win":"flash-lose";
+}
+
+// ======= Admin State =======
+async function initAdminState(){
+  const adminRef=doc(db,"config","adminState");
+  const snap=await getDoc(adminRef);
+  if(!snap.exists()) await setDoc(adminRef,{forceResult:null,locked:false});
+}
+
+function listenAdminState(){
+  const adminRef=doc(db,"config","adminState");
+  onSnapshot(adminRef,snap=>{
+    if(snap.exists()){
+      forceResultValue=snap.data().forceResult;
+      locked=snap.data().locked;
+      if(locked) alert("⚠ Cược đã bị khóa toàn server!");
+    }
+  });
+}
+
+// ======= Admin Functions =======
+async function force(val){ 
+  await updateDoc(doc(db,"config","adminState"),{forceResult:val||null}); 
+}
+async function toggleLock(){ 
+  locked=!locked;
+  await updateDoc(doc(db,"config","adminState"),{locked});
+}
+
+async function grantAdmin(){
+  if(!currentUser) return;
+  const userSnap=await getDoc(doc(db,"users",currentUser));
+  if(!userSnap.data().isAdmin){alert("Chỉ admin mới thực hiện!"); return;}
+  const u=document.getElementById("grantAdminUser").value;
+  const targetRef=doc(db,"users",u);
+  const targetSnap=await getDoc(targetRef);
+  if(targetSnap.exists()){
+    await updateDoc(targetRef,{isAdmin:true});
+    alert(u+" đã được cấp quyền Admin!");
+  }else alert("User không tồn tại!");
+}
+
+// ======= Chat =======
+async function sendChat(){
+  const msg=document.getElementById("chatInput").value;
+  if(!msg) return;
+  await addDoc(collection(db,"chat"),{user:currentUser,msg,time:Date.now()});
+  document.getElementById("chatInput").value="";
+}
+
+function listenChat(){
+  const q=query(collection(db,"chat"),orderBy("time"),limit(100));
+  onSnapshot(q,snap=>{
+    chatMessages.innerHTML="";
+    snap.forEach(doc=>{
+      chatMessages.innerHTML += `<b>${doc.data().user}:</b> ${doc.data().msg}<br>`;
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
+</script>
+</body>
+</html>
